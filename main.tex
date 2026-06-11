@@ -27,10 +27,11 @@
 
 \newpage
 \begin{abstract}
-本项目基于 Geant4 构建了一个多尺度肿瘤放疗模拟程序，用于比较常规外照射放疗粒子与硼中子俘获治疗（Boron Neutron Capture Therapy, BNCT）的剂量沉积特征。模拟分为两个问题：Q1 在人体中比较 gamma 与 proton 的深度剂量、二维能量沉积分布、LET 和能量扫描结果；Q2 在肿瘤区域内构建代表性细胞 patch，研究 $^{10}B$ 均匀分布和外壳层分布对整细胞剂量、细胞核剂量以及 BNCT 二次粒子产额的影响。
+\sloppy
+本项目基于 Geant4 构建了一个多尺度肿瘤放疗模拟程序，比较常规照射（gamma、proton）与硼中子俘获治疗（BNCT）的剂量沉积特征。Q1 在简化人体结构中对比 gamma 与 proton 的深度剂量曲线、二维能量沉积分布、LET 谱及能量扫描结果；Q2 在肿瘤区内构建正常/癌症细胞的混合结构，研究 $^{10}\mathrm{B}$ 均匀分布与壳层分布对整细胞剂量、细胞核剂量及 BNCT 二次粒子产额的影响。
 
-结果表明：gamma 的能量沉积分布较弥散，质子束可通过能量扫描使 Bragg peak 接近肿瘤区；在 Q2 的理想化混合细胞模型中，含 $^{10}B$ 肿瘤细胞比同一区内不含 $^{10}B$ 的对照细胞获得更高剂量。$^{10}B$ 浓度主要影响 BNCT 二次粒子产额及靶细胞剂量，中子照射量主要放大累计剂量和二次粒子产额，而不显著改变局域化比例。
-\end{abstract}
+结果表明：gamma 能量沉积均匀，并未见显著能量沉积区域，proton 可通过能量调节使 Bragg peak 落在肿瘤深度附近；在理想化混合细胞模型中，含 $^{10}\mathrm{B}$ 肿瘤细胞获得的剂量明显高于同场不含 $^{10}\mathrm{B}$ 的对照细胞；$^{10}\mathrm{B}$ 浓度主要影响 BNCT 反应活性与靶细胞剂量，相对中子注量主要放大累计剂量，对剂量局域化比例无显著影响。
+\par\end{abstract}
 
 \noindent 项目代码仓库：\url{https://github.com/wujxy/Geant4TumorTherapySim}
 
@@ -40,147 +41,488 @@
 
 \section{基本研究内容}
 
-本项目围绕“肿瘤细胞放射治疗中不同粒子或不同治疗机制的剂量选择性”展开。使用 Geant4 建立简化人体模型、肿瘤区域、微观细胞模型和剂量分析流程，核心研究内容包括：
+本项目围绕肿瘤放射治疗中不同粒子、不同治疗机制的剂量选择性展开，核心内容包括：
 
 \begin{enumerate}
-    \item 构建简化人体，包括头部、颈部、躯干和双腿，并在躯干内部设置肿瘤区。
-    \item 比较 gamma 与 proton 照射下的肿瘤区和正常组织剂量沉积。
-    \item 通过 gamma 能量扫描和质子能量扫描研究入射能量对剂量空间分布的影响。
-    \item 构建肿瘤区内的混合细胞结构，用于 BNCT 细胞尺度模拟。
-    \item 比较 $^{10}B$ 均匀分布和外壳层分布对整细胞剂量、细胞核剂量和 alpha+$^{7}Li$ 二次粒子产额的影响。
-    \item 进一步扫描 $^{10}B$ 浓度和中子照射量，分析 BNCT 中药物富集与照射量两个因素的不同作用。
+    \item 构建简化人体（头部、颈部、躯干、双腿），在躯干内设置肿瘤区。
+    \item 比较 gamma 与 proton 照射下的肿瘤区与正常细胞区域剂量沉积对比。
+    \item 通过能量扫描研究入射能量对剂量空间分布的影响。
+    \item 构建肿瘤区的正常/肿瘤细胞结构，开展 BNCT 细胞尺度模拟。
+    \item 比较 $^{10}\mathrm{B}$ 均匀分布与壳层分布对整细胞剂量、细胞核剂量及 $\alpha$+$^{7}\mathrm{Li}$ 产额的影响。
+    \item 扫描 $^{10}\mathrm{B}$ 浓度和相对中子注量，分析两者对 BNCT 治疗效果的影响。
 \end{enumerate}
 
-物理列表采用 \verb|QGSP_BIC_HP|。该物理列表包含电磁过程、质子相关强子过程以及高精度低能中子过程，适合在同一程序中处理 Q1 的 gamma/proton 外照射和 Q2 的热中子 BNCT。
+物理列表（Physics List）采用 \verb|QGSP_BIC_HP|，包含电磁过程、质子强子过程和高精度低能中子过程，可在同一程序中处理 Q1 的 gamma/proton 照射和 Q2 的热中子 BNCT。
 
 \section{几何模型与材料定义}
 
 \subsection{人体几何模型}
 
-人体使用水材料近似软组织，世界体积使用空气，避免粒子在到达人体前就在外部水介质中损失能量。模型由几个简单几何体组合而成，具体尺寸见\autoref{tab:body-geometry}。
+人体软组织用水近似，世界体积使用空气。各结构尺寸如下：
 
 \begin{table}[H]
     \centering
     \caption{人体几何模型主要结构}
     \label{tab:body-geometry}
     \small
-    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{1.7cm}>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{3.2cm}}
+    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{1.9cm}>{\raggedright\arraybackslash}p{3.7cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{3.0cm}}
         \toprule
-        结构 & Geant4 几何 & 尺寸 & 位置说明 \\
+        结构 & Geant4 几何 & 尺寸 & 位置 \\
         \midrule
         World & \verb|G4Box| & \verb|3 m x 3 m x 3 m| & 原点中心 \\
         躯干 & \verb|G4Box| & \verb|260 mm x 120 mm x 500 mm| & 原点中心 \\
-        颈部 & \verb|G4Tubs| & 半径 \verb|50 mm|，高度约 \verb|105.2 mm| & \verb|z = 302.6 mm| \\
+        颈部 & \verb|G4Tubs| & 半径 \verb|50 mm|，高 \verb|105.2 mm| & \verb|z = 302.6 mm| \\
         头部 & \verb|G4SubtractionSolid| & 球半径 \verb|90 mm|，扣除颈部插入球冠 & \verb|z = 430 mm| \\
-        左腿/右腿 & \verb|G4Tubs| & 半径 \verb|55 mm|，高度 \verb|820 mm| & \verb|x = -65/+65 mm, z = -660 mm| \\
-        肿瘤区 & \verb|G4Box| & \verb|20 mm x 10 mm x 30 mm| & \verb|(-45, -45, 30) mm| \\
+        左腿/右腿 & \verb|G4Tubs| & 半径 \verb|55 mm|，高 \verb|820 mm| & $x=\mp65\,\mathrm{mm}$, $z=-660\,\mathrm{mm}$ \\
+        肿瘤区 & \verb|G4Box| & \verb|20 mm x 10 mm x 30 mm| & \begin{tabular}[t]{@{}c@{}}$(-45,-45,30)$ \\ mm\end{tabular} \\
         \bottomrule
     \end{tabularx}
 \end{table}
 
-图\ref{fig:body}展示了 Geant4 可视化界面中的整体人体模型。绿色长方体为躯干，橙色圆柱体为颈部，黄色球形结构为头部，蓝色圆柱体为双腿；躯干内部的红色和蓝色小区域分别表示肿瘤区与辅助正常对照区。Q1 的正常组织计分仍采用整个人体模型扣除肿瘤区，而不是只使用蓝色对照盒。图中的坐标轴给出了模型的空间方向和尺度参考。
+图\ref{fig:body}为 Geant4 可视化界面中的整体人体模型。绿色为躯干，橙色为颈部，黄色为头部，蓝色为双腿，躯干内红色小区域为肿瘤区。
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.78\textwidth]{body.png}
-    \caption{Geant4 整体人体模型可视化}
+    \caption{Geant4 人体结构可视化}
     \label{fig:body}
 \end{figure}
 
-颈部上端进入头部球体，插入上端面取在球半径 \verb|90 mm| 与颈部半径 \verb|50 mm| 的交线处，因此头颈外轮廓由原来的点接触改为面接触。为避免 Geant4 几何重叠，头部不是与颈部直接相交的完整球体，而是在球体下方用 CSG 扣除了对应的颈部插入球冠。
-
-肿瘤区被放置在躯干内，大小为 \verb|2 cm x 1 cm x 3 cm|。束流源位于 \verb|(-45, -600, 30) mm|，方向为 \verb|+y|，即沿肿瘤中心所在直线入射。Q1 中正常组织剂量定义为整个人体模型中除肿瘤区以外的所有水组织平均剂量，而不是只取一个局部正常对照盒。
-
-Q1 的宏观几何关系可用两个视角理解。沿束流方向看，源点位于人体外侧，粒子沿 \verb|+y| 方向进入躯干，并在靠近入射侧的肿瘤区附近沉积能量：
-
-\begingroup
-\footnotesize
-\begin{verbatim}
-beam centerline: x = -45 mm, z = 30 mm
-
-y = -600 mm                 y = -60 mm       y = -50~-40 mm        y = +60 mm
-   source  *  -------------------|================[ tumor ]=============|  ---> +y
-                                 torso in           tumor              torso out
-\end{verbatim}
-\endgroup
-
-在垂直束流的 \verb|x-z| 投影中，肿瘤区位于躯干内部偏左、略高于中心的位置。二维剂量热图主要展示的就是这一投影平面上的能量沉积分布：
-
-\begin{verbatim}
-z
-^
-+250 mm   +------------------------------+
-          |                              |
- +30 mm   |        * tumor               |
-          |        center=(-45, 30) mm   |
-          |                              |
--250 mm   +------------------------------+
-          -130 mm          0        +130 mm  -> x
-
-tumor size = 20 mm (x) x 10 mm (y) x 30 mm (z)
-\end{verbatim}
-
-后续二维剂量热图中会用人体躯干边界和肿瘤区边框标出宏观几何关系，可作为肿瘤区设置与剂量空间分布的示意。
+头颈连接处，颈部上端面与头部球面相切，头部采用球体扣除下方球冠的方式避免几何重叠。束流源位于 \verb|(-45, -600, 30) mm|，方向为 \verb|+y|，沿肿瘤中心轴线入射。
 
 \subsection{材料定义}
-
-程序中主要使用三类材料，见\autoref{tab:materials}。
 
 \begin{table}[H]
     \centering
     \caption{材料定义}
     \label{tab:materials}
     \small
-    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.2cm}>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{3.0cm}}
+    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.4cm}>{\raggedright\arraybackslash}p{4.0cm}>{\raggedright\arraybackslash}X}
         \toprule
-        材料 & Geant4 定义 & 密度或组成 & 用途 \\
+        材料 & Geant4 定义 & 用途 \\
         \midrule
-        空气 & \verb|G4_AIR| & NIST 材料 & World 材料 \\
-        水 & \verb|G4_WATER| & NIST 材料，近似 \verb|1 g/cm3| & 人体软组织、正常细胞、未含硼区域 \\
-        $^{10}B$ 硼化水 & \verb|B10_Borated_Water| & \verb|G4_WATER + EnrichedB10|，$^{10}B$ 质量分数由设定浓度控制 & 含硼肿瘤细胞或含硼壳层 \\
+        空气 & \verb|G4_AIR|（NIST） & World \\
+        水 & \verb|G4_WATER|（NIST，\verb|1 g/cm3|） & 人体软组织、无硼区域 \\
+        $^{10}\mathrm{B}$ 硼化水 & 自定义 \verb|B10_Borated_Water| & 含硼肿瘤细胞或硼壳层 \\
         \bottomrule
     \end{tabularx}
 \end{table}
 
-自定义含 $^{10}B$ 材料中，$^{10}B$ 作为同位素定义：
-
-\begin{verbatim}
-Z = 5, A = 10, molar mass = 10.012937 g/mole
-\end{verbatim}
-
-硼质量分数由：
-
-\begin{verbatim}
-boronFraction = boronPPM * 1e-6
-\end{verbatim}
-
-控制。Q2 默认用于机制展示的增强设置为 \verb|500000 ppm|，即 50\% 质量分数的信号增强模型。这个浓度明显高于真实 BNCT 治疗中常见的几十 ppm 量级，主要用于在有限事件数下获得足够的 $^{10}B(n,\alpha)^{7}Li$ 反应信号。
-
-\subsection{计分指标}
-
-所有吸收剂量均由对应体积内的累计能量沉积除以质量得到：
+$^{10}\mathrm{B}$ 同位素参数为 \verb|Z = 5|、\verb|A = 10|、摩尔质量 \verb|10.012937 g/mol|。硼含量用按质量计的 ppm 表示，其中 $1\,\mathrm{ppm}=10^{-6}$ 的质量分数：
 
 \begin{equation}
-    D = \frac{E_\mathrm{dep}}{m}.
+    \omega_{\mathrm{B}} = C_{\mathrm{B}}(\mathrm{ppm}) \times 10^{-6}.
+\end{equation}
+
+Q2 中使用的 $C_{\mathrm{B}}=5.0\times 10^{5}\,\mathrm{ppm}$ 远高于正常治疗的质量分数，对应 $\omega_{\mathrm{B}}=0.5$，即 50\% 质量分数，主要用于在有限事件数下增强反应统计量。
+
+\subsection{辐射剂量说明}
+
+吸收剂量定义为：
+
+\begin{equation}
+    D = \frac{E_{\mathrm{dep}}}{m}.
     \label{eq:dose}
 \end{equation}
 
-本报告使用的计分口径如下：
+其中，$D$ 为吸收剂量，表示单位质量物质吸收的电离辐射能量；$E_{\mathrm{dep}}$ 为沉积能量，即射线或粒子在特定几何区域内由于相互作用而损失并留在该区域内的总能量；$m$ 为接收该段能量的目标区域质量。
+
+各监测指标的直观含义与计算方法如下：
 
 \begin{itemize}
-    \item \textbf{Q1 肿瘤区/正常组织平均 event 剂量}：单个初级粒子事件在宏观肿瘤区或正常组织中的能量沉积除以对应区域质量，再对全部事件取平均。肿瘤区质量按水密度和肿瘤体积估算；正常组织质量按整个人体模型体积扣除肿瘤体积估算。因此，两者数值同时受能量沉积和区域质量影响。
-    \item \textbf{Q1 深度剂量与二维热图}：分别统计沿 y 方向各 bin 和三维体素内的累计能量沉积；图中为归一化能量沉积分布，用于比较空间形状，不表示绝对剂量。
-    \item \textbf{Q1 LET}：按每个 Geant4 step 的 \verb|E_dep / stepLength| 统计，并按 step 数归一化。该量用于比较本模拟中的微观能损特征，不等同于剂量加权 LET 或临床 RBE。
-    \item \textbf{Q2 整细胞剂量}：整次运行中沉积在单个球形细胞内的总能量除以完整细胞质量，包含该细胞核内的能量沉积。
-    \item \textbf{Q2 细胞核剂量}：整次运行中沉积在单个细胞核内的总能量除以细胞核质量。肿瘤细胞和对照细胞的平均值均对各自全部 \verb|2048| 个细胞求平均，未发生能量沉积的细胞也以零值计入。
-    \item \textbf{Q2 y 投影细胞剂量}：将同一 \verb|(x,z)| 柱内不同 y 层细胞的整细胞剂量相加，仅用于显示微区内的空间分布。
-    \item \textbf{alpha+$^{7}Li$ 二次粒子产额}：运行中生成的 alpha 与 $^{7}Li$ 二次粒子数量之和，用作 BNCT 反应活性的代理指标；它不是严格的反应次数。
+    \item \textbf{肿瘤/正常细胞平均剂量}：每个入射粒子在目标区域内沉积的平均剂量，正常细胞质量由人体扣除肿瘤细胞后计算得到。
+    \item \textbf{Q1 深度剂量与二维热图}：展示剂量在空间（一维深度、二维平面）上的相对分布形状，数据已做归一化处理。
+    \item \textbf{Q1 线能量转移}：按每个 step 的 \verb|E_dep / stepLength| 统计并对 step 数归一化，展示能量的平均损失速率。
+    \item \textbf{Q2 整细胞剂量}：整次运行中沉积在单个球形细胞（含细胞核）内的总能量除以细胞质量，对全部 2048 个细胞取平均，未发生沉积的细胞以零计入。
+    \item \textbf{Q2 细胞核剂量}：沉积在单个细胞核内的总能量除以细胞核质量，平均方式同上。
+    \item \textbf{Q2 细胞剂量沉积}：同一 \verb|(x,z)| 内各 y 层整细胞剂量之和，用于展示空间分布趋势。
+    \item \textbf{$\alpha$+$^{7}\mathrm{Li}$ 产额}：运行中生成的 $\alpha$ 与 $^{7}\mathrm{Li}$ 二次粒子数之和，作为 BNCT 反应活性指标。
 \end{itemize}
 
-Q1 使用每事件宏观区域计分，Q2 使用整次运行累计的单细胞计分，两者质量尺度和归一化方式不同，不能直接比较绝对剂量。
+注：Q1 使用每事件宏观区域计分，Q2 使用整次运行累计的单细胞计分，两者质量尺度不同，不能直接比较绝对剂量。
 
-\section*{后续内容}
+\section{Q1：gamma 与 proton 照射对比}
 
-Q1、Q2、局限性和结论部分将按同一格式继续从 Markdown 报告迁移。当前版本先保留摘要、基本研究内容、几何模型、材料定义与计分指标，用于预览封面、目录、表格、图片、公式和代码块的整体排版效果。
+\subsection{研究目标}
+
+Q1 比较 gamma 与 proton 在宏观人体模型中的剂量沉积差异，重点关注：Bragg peak 是否能落在肿瘤深度附近、入射能量变化对剂量空间分布的影响，以及两种粒子的 LET 谱差异。
+
+相关参数设置如下：
+
+\begin{table}[H]
+    \centering
+    \caption{Q1 基本照射参数}
+    \label{tab:q1-basic}
+    \begin{tabular}{lccc}
+        \toprule
+        粒子 & 能量 & 束斑半径 & 事件数 \\
+        \midrule
+        gamma & \verb|1 MeV| & \verb|8 mm| & \verb|1000| \\
+        proton & \verb|45 MeV| & \verb|8 mm| & \verb|1000| \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+能量扫描设置如下：
+
+\begin{table}[H]
+    \centering
+    \caption{Q1 能量扫描设置}
+    \label{tab:q1-scan}
+    \small
+    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.0cm}>{\raggedright\arraybackslash}X>{\raggedleft\arraybackslash}p{2.4cm}}
+        \toprule
+        扫描类型 & 能量点 & 每点事件数 \\
+        \midrule
+        gamma scan & \verb|0.2, 0.5, 1, 2, 4, 6, 8, 10, 15 MeV| & \verb|1000| \\
+        proton scan & \verb|30, 35, 40, 45, 50, 55, 60, 70, 80 MeV| & \verb|500| \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsection{深度剂量分布}
+
+图\ref{fig:q1-depth-dose}为 gamma 和 proton 沿 y 方向的归一化深度剂量曲线。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{Q1_depth_dose.png}
+    \caption{Q1 gamma 与 proton 深度剂量曲线}
+    \label{fig:q1-depth-dose}
+\end{figure}
+
+gamma 的能量沉积沿路径缓慢衰减，无明显峰值；45 MeV proton 在 $y\approx -50\,\mathrm{mm}$ 至 $-40\,\mathrm{mm}$ 附近形成 Bragg peak，与当前几何中肿瘤位置较匹配，肿瘤区能量沉积显著高于 gamma。
+
+\subsection{二维剂量热图与肿瘤区设置}
+
+图\ref{fig:q1-dose-heatmap}为两种粒子在躯干投影平面上的二维能量沉积分布，白色和蓝色边框分别标记躯干与肿瘤区边界。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.88\textwidth]{Q1_dose_heatmap.png}
+    \caption{Q1 gamma 与 proton 二维剂量热图}
+    \label{fig:q1-dose-heatmap}
+\end{figure}
+
+gamma 热图的能量沉积沿入射路径弥散分布；proton 热图在肿瘤位置附近呈现局部高剂量区，与深度剂量结果一致。质子治疗的剂量学优势来自 Bragg peak 的空间可控性，而非粒子本身能量更高。
+
+\subsection{gamma 能量扫描}
+
+图\ref{fig:q1-gamma-grid}为不同 gamma 能量下的二维剂量热图网格。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{Q1_gamma_energy_heatmap_grid.png}
+    \caption{Q1 gamma 能量二维热图扫描}
+    \label{fig:q1-gamma-grid}
+\end{figure}
+
+gamma 没有 Bragg peak，能量扫描的主要效果是提高穿透深度，整体剂量沉积区向人体深部延伸，但肿瘤区能量沉积比例无明显局部最优。
+
+图\ref{fig:q1-gamma-scan}为定量扫描结果，以剂量加权平均深度 \verb|y_mean| 表征整体移动趋势。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.88\textwidth]{Q1_gamma_energy_scan.png}
+    \caption{Q1 gamma 能量扫描指标}
+    \label{fig:q1-gamma-scan}
+\end{figure}
+
+随 gamma 能量升高，\verb|y_mean| 向更深区域移动，穿透能力增强，但剂量聚焦能力弱，肿瘤沉积能量分数无显著提升。
+
+\subsection{proton 能量扫描}
+
+图\ref{fig:q1-proton-grid}为不同 proton 能量下的二维剂量热图网格。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{Q1_proton_energy_heatmap_grid.png}
+    \caption{Q1 proton 能量二维热图扫描}
+    \label{fig:q1-proton-grid}
+\end{figure}
+
+随质子能量升高，Bragg peak 沿束流方向向下游移动。能量过低时峰值在入射侧较浅位置，能量过高时峰值越过肿瘤区，因此需通过能量扫描将峰值匹配至肿瘤深度。
+
+图\ref{fig:q1-proton-scan}为定量指标，关键指标为肿瘤沉积能量分数：
+
+\begin{equation}
+    \omega_E = \frac{E_{\mathrm{tumor}}}{E_{\mathrm{tumor}} + E_{\mathrm{normal}}}.
+\end{equation}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.88\textwidth]{Q1_proton_energy_scan.png}
+    \caption{Q1 proton 能量扫描指标}
+    \label{fig:q1-proton-scan}
+\end{figure}
+
+扫描结果显示，45 MeV 质子在当前几何中该分数较高，是较合适的展示能量。
+
+\subsection{LET 谱比较}
+
+图\ref{fig:q1-let}为 gamma 与 proton 在肿瘤区内的 LET 谱，横轴限制在 $0$--$2\,\mathrm{MeV}/\mu\mathrm{m}$。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.86\textwidth]{Q1_let_spectra.png}
+    \caption{Q1 肿瘤区 LET 谱}
+    \label{fig:q1-let}
+\end{figure}
+
+proton 的 step-LET 谱尾部更长，按 step 统计的平均值高于 gamma，反映质子在接近射程末端能损更集中。受限于统计量，该结果作为辅助信息，Q1 的主要剂量学结论依据深度剂量曲线、二维热图和能量扫描。
+
+\subsection{Q1 小结}
+
+gamma 无 Bragg peak，剂量相对平均；proton 可通过能量调节将 Bragg peak 放置于肿瘤深度，45 MeV 与当前几何匹配较好。gamma 能量扫描主要改变穿透深度，proton 能量扫描直接改变 Bragg peak 位置。质子治疗相对 gamma 的核心优势在于剂量空间可控性。
+
+\section{Q2：BNCT 细胞尺度模拟}
+
+\subsection{研究目标}
+
+BNCT 通过含硼载体药物使肿瘤细胞选择性富集 $^{10}\mathrm{B}$，再用低能中子照射，引发：
+
+\begin{equation}
+    ^{10}\mathrm{B} + n \rightarrow \alpha + ^{7}\mathrm{Li}.
+\end{equation}
+
+反应产物 $\alpha$ 和 $^{7}\mathrm{Li}$ 射程仅约 $10\,\mu\mathrm{m}$，能量主要沉积在含硼细胞及其近邻区域，实现细胞尺度的剂量局域化。
+
+Q2 的目标是：在同一中子场内，比较 $^{10}\mathrm{B}$ 均匀分布与壳层分布两种情形下，含硼肿瘤细胞与不含硼对照细胞的整细胞剂量、细胞核剂量和 $\alpha$+$^{7}\mathrm{Li}$ 产额差异，并通过 $^{10}\mathrm{B}$ 浓度和中子注量扫描分别分析两个参数的作用。
+
+\subsection{混合细胞模型}
+
+在宏观肿瘤区内设置一个代表性采样，而非将整个厘米量级的肿瘤区全部离散为微米尺度细胞（计算量过大），参数如下：
+
+\begin{table}[H]
+    \centering
+    \caption{Q2 混合细胞模型参数}
+    \label{tab:q2-cell-model}
+    \begin{tabular}{lc}
+        \toprule
+        参数 & 数值 \\
+        \midrule
+        采样尺寸 & \verb|200 um x 200 um x 200 um| \\
+        细胞中心间距 & \verb|12 um| \\
+        细胞直径 & \verb|10 um| \\
+        细胞核半径 & \verb|2.5 um| \\
+        shell 模式硼壳层厚度 & \verb|1 um| \\
+        总细胞数 & \verb|4096|（肿瘤细胞 2048，对照细胞 2048） \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+混合排列方式如图\ref{fig:q2-layout}所示，红色为含 $^{10}\mathrm{B}$ 肿瘤细胞，绿色为无 $^{10}\mathrm{B}$ 正常细胞。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\textwidth]{Q2_geometry_mixed_cell_layout.png}
+    \caption{Q2 代表性肿瘤微区混合细胞排列}
+    \label{fig:q2-layout}
+\end{figure}
+
+两类细胞位于同一微区和同一中子场内，后续剂量差异主要反映 $^{10}\mathrm{B}$ 富集的影响，而非空间位置差异。为便于沿束流方向投影，同一 \verb|(x,z)| 柱内各 y 层保持相同细胞类型，\verb|x-z| 平面保持交错分布。
+
+\subsection{\texorpdfstring{$^{10}\mathrm{B}$}{10B} 分布模式}
+
+比较两种 $^{10}\mathrm{B}$ 分布模式，示意见图\ref{fig:q2-boron-model}。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\textwidth]{Q2_boron_distribution_cell_model.png}
+    \caption{Q2 $^{10}\mathrm{B}$ 在肿瘤细胞中的分布模式}
+    \label{fig:q2-boron-model}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{$^{10}\mathrm{B}$ 分布模式}
+    \label{tab:q2-boron-mode}
+    \small
+    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.2cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X}
+        \toprule
+        模式 & 定义 & 物理含义 \\
+        \midrule
+        uniform & 整个肿瘤细胞（含细胞核）均匀含 $^{10}\mathrm{B}$ & $^{10}\mathrm{B}$ 进入细胞内部 \\
+        shell & $^{10}\mathrm{B}$ 集中在细胞外侧 \verb|1 um| 壳层 & $^{10}\mathrm{B}$ 偏向细胞膜或细胞外周区域 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+相关参数设置如下：
+
+\begin{table}[H]
+    \centering
+    \caption{Q2 BNCT 基本参数}
+    \label{tab:q2-basic}
+    \begin{tabular}{lc}
+        \toprule
+        参数 & 数值 \\
+        \midrule
+        中子能量 & \verb|0.5 eV| \\
+        束斑半径 & \verb|150 um| \\
+        $^{10}\mathrm{B}$ 浓度 & \verb|500000 ppm| \\
+        每组事件数 & \verb|20000| \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{固定浓度下的剂量沉积比较}
+
+为了深入对比两种不同的硼形态（均匀分布模式 uniform 与细胞膜/外壳分布模式 shell）对微观剂量的影响，本节采用高统计量（20 万个入射粒子）的模拟结果进行分析。
+
+图\ref{fig:q2-micro-dose}展示了两种模式下，细胞在 y 方向投影的剂量热力图。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{Q2_micro_dose_map_uniform_vs_shell.png}
+    \caption{Q2 uniform 与 shell 模式下的微区 y 投影剂量热图}
+    \label{fig:q2-micro-dose}
+\end{figure}
+
+从热力图中可以看出，含有 $^{10}\mathrm{B}$ 的肿瘤细胞区域，其辐射剂量显著高于不含硼的对照组（正常细胞区域）。在 20 万个入射粒子下，均匀分布模式和外壳分布模式分别触发了 1495 次和 829 次 BNCT 核心反应，即生成的 $\alpha + ^{7}\mathrm{Li}$ 粒子数。
+
+具体结果如表\ref{tab:q2-fixed-dose}所示。
+
+\begin{table}[H]
+    \centering
+    \caption{固定浓度下 uniform 与 shell 模式剂量比较}
+    \label{tab:q2-fixed-dose}
+    \small
+    \begin{tabular}{lcccc}
+        \toprule
+        模式 & 肿瘤整细胞剂量 & 正常整细胞剂量 & 肿瘤核剂量 & 正常核剂量 \\
+        \midrule
+        uniform & $1.54\times 10^{-1}\,\mathrm{Gy}$ & $3.60\times 10^{-3}\,\mathrm{Gy}$ & $2.06\times 10^{-1}\,\mathrm{Gy}$ & $1.96\times 10^{-3}\,\mathrm{Gy}$ \\
+        shell & $6.99\times 10^{-2}\,\mathrm{Gy}$ & $2.65\times 10^{-3}\,\mathrm{Gy}$ & $3.47\times 10^{-2}\,\mathrm{Gy}$ & $1.21\times 10^{-3}\,\mathrm{Gy}$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+uniform 模式的肿瘤细胞核剂量高于 shell，与 $^{10}\mathrm{B}$ 分布在整个细胞体积内、短射程产物更易直接沉积于细胞核的机制一致；shell 模式中 $^{10}\mathrm{B}$ 位于外侧壳层，产物更多沉积于壳层或细胞质附近，向细胞核输送的剂量相应减少。
+
+\subsection{\texorpdfstring{$^{10}\mathrm{B}$}{10B} 浓度扫描}
+
+固定中子能量，扫描 $^{10}\mathrm{B}$ 浓度，每点 200000 个入射粒子：
+
+\begin{center}
+    \verb|1000, 3000, 10000, 30000, 100000, 300000, 500000 ppm|
+\end{center}
+
+定义剂量局域化指标：
+
+\begin{equation}
+    S_{\mathrm{cell}} =
+    \frac{D_{\mathrm{tumor,cell}}}{D_{\mathrm{tumor,cell}} + D_{\mathrm{normal,cell}}},
+\end{equation}
+
+\begin{equation}
+    S_{\mathrm{nucleus}} =
+    \frac{D_{\mathrm{tumor,nucleus}}}{D_{\mathrm{tumor,nucleus}} + D_{\mathrm{normal,nucleus}}}.
+\end{equation}
+
+$S$ 越接近 1，剂量越集中于含 $^{10}\mathrm{B}$ 细胞。
+
+图\ref{fig:q2-b10-scan}展示浓度扫描的四个子图：剂量局域化比例、累计细胞核剂量、$\alpha$+$^{7}\mathrm{Li}$ 产额、肿瘤核剂量与整细胞剂量之比。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\textwidth]{Q2_b10_concentration_scan.png}
+    \caption{Q2 $^{10}\mathrm{B}$ 浓度扫描}
+    \label{fig:q2-b10-scan}
+\end{figure}
+
+随 $^{10}\mathrm{B}$ 浓度从 1000 ppm 升至 500000 ppm，uniform 的 $\alpha$+$^{7}\mathrm{Li}$ 产额由 45 增至 1432，shell 由 41 增至 875，两条曲线均呈单调上升趋势，证实了“提高 $^{10}\mathrm{B}$ 浓度可增加 BNCT 反应活性”的预期。uniform 模式的肿瘤核剂量总体高于 shell；低浓度区因俘获反应数较少，核剂量和局域化比例存在残余统计涨落。
+
+\subsection{中子注量扫描}
+
+固定 $^{10}\mathrm{B}$ 浓度为 \verb|500000 ppm|，扫描中子数如下：
+
+\begin{center}
+    \verb|2000, 5000, 10000, 20000, 50000, 100000, 200000|
+\end{center}
+
+在束斑面积和单粒子设置不变时，模拟的粒子总数与相对中子注量成正比，可直接作为中子注量的线性指标。图\ref{fig:q2-fluence-scan}展示累计剂量和二次粒子产额随注量的变化趋势。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\textwidth]{Q2_neutron_fluence_scan.png}
+    \caption{Q2 相对中子注量扫描}
+    \label{fig:q2-fluence-scan}
+\end{figure}
+
+结果表明，随着粒子总数的增加，肿瘤细胞整体剂量、肿瘤细胞核剂量以及 $\alpha + ^{7}\mathrm{Li}$ 的产额均呈线性单调递增趋势。这一结果符合硼中子俘获治疗（BNCT）的物理预期，即反应发生概率与入射中子注量成正比：
+
+\begin{equation}
+    R_{\mathrm{BNCT}} \approx N_{^{10}\mathrm{B}}\cdot \phi_n \cdot \sigma.
+\end{equation}
+
+但 \verb|S_cell| 与 \verb|S_nucleus| 基本维持在较高平台区域，不随入射粒子数单调变化。这一现象表明，增加中子照射量主要体现为绝对剂量的等比例放大，而不会改变由 $^{10}\mathrm{B}$ 浓度造成的反应效率问题。
+
+图\ref{fig:q2-fluence-maps}为不同入射粒子数下的 y 投影热图。随注量增加，热点数量和亮度明显增加，对照细胞的背景剂量也随之积累。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\textwidth]{Q2_neutron_fluence_projected_maps.png}
+    \caption{Q2 相对中子注量扫描的投影热图}
+    \label{fig:q2-fluence-maps}
+\end{figure}
+
+\subsection{BNCT 方法与 Proton/Gamma 射线对比}
+
+为在相同几何下比较不同治疗机制的细胞剂量局域化，补充了 Q2 内部对照实验：保持同一混合细胞采样、束流位置、150 $\mu$m 束斑半径和入射数，将中子 BNCT 与 1 MeV gamma、45 MeV proton 并行比较。
+
+\begin{table}[H]
+    \centering
+    \caption{Q2 不同治疗机制对照设置}
+    \label{tab:q2-therapy-comparison}
+    \small
+    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{3.2cm}>{\raggedleft\arraybackslash}p{2.0cm}}
+        \toprule
+        方法 & $^{10}\mathrm{B}$ 模式 & 粒子与能量 & 事件数 \\
+        \midrule
+        gamma & 无 & \verb|gamma 1 MeV| & \verb|20000| \\
+        proton & 无 & \verb|proton 45 MeV| & \verb|20000| \\
+        BNCT uniform & uniform，\verb|500000 ppm| & \verb|neutron 0.5 eV| & \verb|20000| \\
+        BNCT shell & shell，\verb|500000 ppm| & \verb|neutron 0.5 eV| & \verb|20000| \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+该对照统一了几何和入射粒子数，但未统一入射总能量、剂量或反应，结论限于不同机制下的物理剂量局域化比较。
+
+gamma 和 proton 对两类细胞无材料选择性，肿瘤细胞与对照细胞平均剂量接近；BNCT 两组因 $^{10}\mathrm{B}$ 仅加载于肿瘤细胞，整细胞剂量局域化指标 \verb|S_cell| 明显更高。
+
+图\ref{fig:q2-therapy-comparison}按列展示四种方法的 y 投影热图（各自归一化色标）、分组柱状剂量比较（共享坐标轴）及整细胞局域化指标 \verb|S_cell|。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{Q2_therapy_comparison_projected_maps.png}
+    \caption{Q2 BNCT 与常规射线的投影热图及整细胞指标对比}
+    \label{fig:q2-therapy-comparison}
+\end{figure}
+
+\subsection{Q2 小结}
+
+在本次研究中，通过构建混合细胞模型，验证了 BNCT 的核心物理特征：BNCT 的细胞靶向选择性依赖于 $^{10}\mathrm{B}$ 在肿瘤细胞中的富集。硼元素在细胞内均匀分布（uniform）时，粒子能量更易直达细胞核，对肿瘤细胞核的剂量沉积效果显著优于外壳分布（shell）。中子注量主要决定累计剂量大小，但不会改变由 $^{10}\mathrm{B}$ 富集与分布决定的细胞选择性。
+
+\section{结论}
+
+本项目完成了从宏观人体能量沉积到微观细胞 BNCT 计分的 Geant4 多尺度模拟。
+
+Q1 表明：gamma 能量沉积弥散，无明显峰值；proton 可通过能量调节将 Bragg peak 置于肿瘤深度，45 MeV 与当前几何匹配最佳，质子治疗的关键优化变量是入射能量。
+
+Q2 表明：在 $^{10}\mathrm{B}$ 仅富集于肿瘤细胞的理想模型中，$\alpha$/$^{7}\mathrm{Li}$ 短射程产物形成明显的细胞尺度剂量局域化；$^{10}\mathrm{B}$ 浓度影响反应活性与靶细胞剂量，uniform 分布更有利于提高肿瘤核剂量；相对中子注量主要控制累计剂量和二次粒子产额，不改变由 $^{10}\mathrm{B}$ 分布决定的细胞选择性。
+
+因此，评价 BNCT 需同时考察 $^{10}\mathrm{B}$ 摄取分布、细胞剂量局域化、二次粒子产额和细胞核剂量，而不能仅凭绝对剂量判断。本项目为进一步引入真实组织材料、实际硼药物摄取分布、重复统计、RBE 修正和细胞生存模型提供了建模基础。
+
+\section{局限性}
+
+虽然模型成功反映了物理趋势，但由于以下简化，结果不能直接等同于临床真实情况：
+
+\begin{itemize}
+    \item 整个三维人体模型全部用纯水代替，忽视了骨骼、肺部和脂肪等真实组织对中子的散射与衰减。同时，Q1 宏观剂量由于模拟粒子数有限，导致 Bragg 峰的曲线形状较为粗糙。
+    \item 材料与浓度设定偏离临床。为了在 Q2 微观模拟中获得明显的增强信号，采用了极高的硼浓度（500000 ppm），且假设正常对照细胞完全不吸附硼。现实中正常组织也会误吸收少量硼药物，因此当前模型明显高估了细胞的选择性。
+    \item 缺乏能量与生物效应归一化。当前仅对比了纯物理剂量，未引入 RBE（相对生物效应）修正、DNA 损伤模型或细胞存活曲线。此外，由于不同粒子对照时未统一入射总能量或处方剂量，目前的结论仅限于定性比较物理剂量的局域化特征，无法直接外推为实际的细胞杀伤率。
+\end{itemize}
 
 \end{document}
