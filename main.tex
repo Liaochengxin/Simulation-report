@@ -1,152 +1,186 @@
 %!TeX program = xelatex
-\documentclass[12pt,hyperref,a4paper,UTF8]{ctexart}
+\documentclass[12pt,hyperref,a4paper,UTF8,fontset=fandol]{ctexart}
 \usepackage{UCASReport}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{tabularx}
 
-%%-------------------------------正文开始---------------------------%%
+\graphicspath{{../../figures/}{figures/}}
+\setlength{\headheight}{14.5pt}
+
+\title{
+    \vspace{3cm}
+    \heiti \Huge \textbf{Geant4 放射性肿瘤治疗模拟项目报告}
+    \vspace{4cm}
+}
+\author{
+    \kaishu\Large Geant4 Tumor Therapy Simulation
+}
+\date{\today}
+
 \begin{document}
 
-%%-----------------------封面--------------------%%
 \cover
+\thispagestyle{empty}
 
-%%------------------摘要-------------%%
-%\begin{abstract}
-%
-%在此填写摘要内容
-%
-%\end{abstract}
+\newpage
+\begin{abstract}
+本项目基于 Geant4 构建了一个多尺度肿瘤放疗模拟程序，用于比较常规外照射放疗粒子与硼中子俘获治疗（Boron Neutron Capture Therapy, BNCT）的剂量沉积特征。模拟分为两个问题：Q1 在人体中比较 gamma 与 proton 的深度剂量、二维能量沉积分布、LET 和能量扫描结果；Q2 在肿瘤区域内构建代表性细胞 patch，研究 $^{10}B$ 均匀分布和外壳层分布对整细胞剂量、细胞核剂量以及 BNCT 二次粒子产额的影响。
 
-\thispagestyle{empty} % 首页不显示页码
+结果表明：gamma 的能量沉积分布较弥散，质子束可通过能量扫描使 Bragg peak 接近肿瘤区；在 Q2 的理想化混合细胞模型中，含 $^{10}B$ 肿瘤细胞比同一区内不含 $^{10}B$ 的对照细胞获得更高剂量。$^{10}B$ 浓度主要影响 BNCT 二次粒子产额及靶细胞剂量，中子照射量主要放大累计剂量和二次粒子产额，而不显著改变局域化比例。
+\end{abstract}
 
-%%--------------------------目录页------------------------%%
+\noindent 项目代码仓库：\url{https://github.com/wujxy/Geant4TumorTherapySim}
+
 \newpage
 \tableofcontents
-
-%%------------------------正文页从这里开始-------------------%
 \newpage
 
-%%可选择这里也放一个标题
-%\begin{center}
-%    \title{ \Huge \textbf{{标题}}}
-%\end{center}
+\section{基本研究内容}
 
-\section{模板说明}
-本模板主要适用于一些课程的平时论文以及期末论文，默认页边距为2.5cm，中文宋体，英文Times New Roman，字号为12pt（小四）。
+本项目围绕“肿瘤细胞放射治疗中不同粒子或不同治疗机制的剂量选择性”展开。使用 Geant4 建立简化人体模型、肿瘤区域、微观细胞模型和剂量分析流程，核心研究内容包括：
 
-编译方式：\verb|xelatex -> bibtex -> xelatex*2|
+\begin{enumerate}
+    \item 构建简化人体，包括头部、颈部、躯干和双腿，并在躯干内部设置肿瘤区。
+    \item 比较 gamma 与 proton 照射下的肿瘤区和正常组织剂量沉积。
+    \item 通过 gamma 能量扫描和质子能量扫描研究入射能量对剂量空间分布的影响。
+    \item 构建肿瘤区内的混合细胞结构，用于 BNCT 细胞尺度模拟。
+    \item 比较 $^{10}B$ 均匀分布和外壳层分布对整细胞剂量、细胞核剂量和 alpha+$^{7}Li$ 二次粒子产额的影响。
+    \item 进一步扫描 $^{10}B$ 浓度和中子照射量，分析 BNCT 中药物富集与照射量两个因素的不同作用。
+\end{enumerate}
 
+物理列表采用 \verb|QGSP_BIC_HP|。该物理列表包含电磁过程、质子相关强子过程以及高精度低能中子过程，适合在同一程序中处理 Q1 的 gamma/proton 外照射和 Q2 的热中子 BNCT。
 
-默认模板文件由以下四部分组成：
-\begin{itemize}
-    \item \texttt{main.tex} 主文件
-    \item \texttt{reference.bib} 参考文献，使用bibtex
-    \item \texttt{UCASReport.sty} 文档格式控制，包括一些基础的设置，如页眉、标题、姓名等
-    \item \texttt{figures} 放置图片的文件夹
-\end{itemize}
+\section{几何模型与材料定义}
 
-第一次使用时需前往\texttt{UCASReport.sty} 对标题、姓名、学号、院所、页眉等进行设置，设置完后即可一劳永逸，封面logo亦可替换
+\subsection{人体几何模型}
 
-默认带有封面页以及目录页，页码从目录页开始
+人体使用水材料近似软组织，世界体积使用空气，避免粒子在到达人体前就在外部水介质中损失能量。模型由几个简单几何体组合而成，具体尺寸见\autoref{tab:body-geometry}。
 
-\section{一些插入功能}
-\subsection{插入公式}
-行内公式$v-\varepsilon+\phi=2$。
-
-插入行间公式如\autoref{Euler}：
-\begin{equation}
-    v-\varepsilon+\phi=2
-    \label{Euler}
-\end{equation}
-
-\subsection{插入图片}
-UCAS校徽如\autoref{UCAS}所示，注意这里使用了\verb|~\autoref{}|命令，也就是会自动生成“图”“式”等前缀，无需手动输入。
-
-\begin{figure}[!htbp]
+\begin{table}[H]
     \centering
-    \includegraphics[width =.4\textwidth]{figures/ucas_logo.pdf}
-    \caption{中国科学院大学}
-    \label{UCAS}
-\end{figure}
-
-插入上面图片的代码：
-
-\begin{verbatim}
-    \begin{figure}[!htbp]
-        \centering
-        \includegraphics[width =.4\textwidth]{figures/ucas_logo.pdf}
-        \caption{中国科学院大学}
-        \label{UCAS}
-    \end{figure}
-\end{verbatim}
-
-\subsection{插入文本框}
-本模板定义了一个圆角灰底的文本框，使用简化命令\verb|\tbox{}|即可，如果你不喜欢，可以前往 \texttt{UCASReport.sty}对其进行修改。
-
-\tbox{
-    这是一个圆角灰底的文本框
-}
-
-\subsection{插入表格}
-本模板文件如\autoref{doc}所示。
-\begin{table}[!htbp]
-    \centering
-    \begin{tabular}{l  | l}
-    \hline
-        文件名 & 说明 \\
-        \hline
-        \texttt{main.tex}  & 主文件 \\
-        \texttt{reference.bib} & 参考文献 \\
-        \texttt{UCASReport.sty}  & 文档格式控制\\
-        \texttt{figures}  & 图片文件夹 \\
-        \hline
-    \end{tabular}
-    \caption{本模板文件组成}
-    \label{doc}
+    \caption{人体几何模型主要结构}
+    \label{tab:body-geometry}
+    \small
+    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{1.7cm}>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{3.2cm}}
+        \toprule
+        结构 & Geant4 几何 & 尺寸 & 位置说明 \\
+        \midrule
+        World & \verb|G4Box| & \verb|3 m x 3 m x 3 m| & 原点中心 \\
+        躯干 & \verb|G4Box| & \verb|260 mm x 120 mm x 500 mm| & 原点中心 \\
+        颈部 & \verb|G4Tubs| & 半径 \verb|50 mm|，高度约 \verb|105.2 mm| & \verb|z = 302.6 mm| \\
+        头部 & \verb|G4SubtractionSolid| & 球半径 \verb|90 mm|，扣除颈部插入球冠 & \verb|z = 430 mm| \\
+        左腿/右腿 & \verb|G4Tubs| & 半径 \verb|55 mm|，高度 \verb|820 mm| & \verb|x = -65/+65 mm, z = -660 mm| \\
+        肿瘤区 & \verb|G4Box| & \verb|20 mm x 10 mm x 30 mm| & \verb|(-45, -45, 30) mm| \\
+        \bottomrule
+    \end{tabularx}
 \end{table}
 
-%\section{定理环境}
-%\begin{Theorem}
-%\end{Theorem}
-%
-%\begin{Lemma}
-%\end{Lemma}
-%
-%\begin{Corollary}
-%\end{Corollary}
-%
-%\begin{Proposition}
-%\end{Proposition}
-%
-%\begin{Definition}
-%\end{Definition}
-%
-%\begin{Example}
-%\end{Example}
-%
-%\begin{proof}
-%\end{proof}
+图\ref{fig:body}展示了 Geant4 可视化界面中的整体人体模型。绿色长方体为躯干，橙色圆柱体为颈部，黄色球形结构为头部，蓝色圆柱体为双腿；躯干内部的红色和蓝色小区域分别表示肿瘤区与辅助正常对照区。Q1 的正常组织计分仍采用整个人体模型扣除肿瘤区，而不是只使用蓝色对照盒。图中的坐标轴给出了模型的空间方向和尺度参考。
 
-\subsection{插入参考文献}
-直接使用\verb|\cite{}|即可。
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.78\textwidth]{body.png}
+    \caption{Geant4 整体人体模型可视化}
+    \label{fig:body}
+\end{figure}
 
-例如：
+颈部上端进入头部球体，插入上端面取在球半径 \verb|90 mm| 与颈部半径 \verb|50 mm| 的交线处，因此头颈外轮廓由原来的点接触改为面接触。为避免 Geant4 几何重叠，头部不是与颈部直接相交的完整球体，而是在球体下方用 CSG 扣除了对应的颈部插入球冠。
 
+肿瘤区被放置在躯干内，大小为 \verb|2 cm x 1 cm x 3 cm|。束流源位于 \verb|(-45, -600, 30) mm|，方向为 \verb|+y|，即沿肿瘤中心所在直线入射。Q1 中正常组织剂量定义为整个人体模型中除肿瘤区以外的所有水组织平均剂量，而不是只取一个局部正常对照盒。
 
-   \textit{ 此处引用了文献\cite{0Isaac}。此处引用了文献\cite{2016The}}
+Q1 的宏观几何关系可用两个视角理解。沿束流方向看，源点位于人体外侧，粒子沿 \verb|+y| 方向进入躯干，并在靠近入射侧的肿瘤区附近沉积能量：
 
+\begingroup
+\footnotesize
+\begin{verbatim}
+beam centerline: x = -45 mm, z = 30 mm
 
-引用过的文献会自动出现在参考文献中。
+y = -600 mm                 y = -60 mm       y = -50~-40 mm        y = +60 mm
+   source  *  -------------------|================[ tumor ]=============|  ---> +y
+                                 torso in           tumor              torso out
+\end{verbatim}
+\endgroup
 
-\section{写在最后}
-\subsection{发布地址}
+在垂直束流的 \verb|x-z| 投影中，肿瘤区位于躯干内部偏左、略高于中心的位置。二维剂量热图主要展示的就是这一投影平面上的能量沉积分布：
+
+\begin{verbatim}
+z
+^
++250 mm   +------------------------------+
+          |                              |
+ +30 mm   |        * tumor               |
+          |        center=(-45, 30) mm   |
+          |                              |
+-250 mm   +------------------------------+
+          -130 mm          0        +130 mm  -> x
+
+tumor size = 20 mm (x) x 10 mm (y) x 30 mm (z)
+\end{verbatim}
+
+后续二维剂量热图中会用人体躯干边界和肿瘤区边框标出宏观几何关系，可作为肿瘤区设置与剂量空间分布的示意。
+
+\subsection{材料定义}
+
+程序中主要使用三类材料，见\autoref{tab:materials}。
+
+\begin{table}[H]
+    \centering
+    \caption{材料定义}
+    \label{tab:materials}
+    \small
+    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.2cm}>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{3.0cm}}
+        \toprule
+        材料 & Geant4 定义 & 密度或组成 & 用途 \\
+        \midrule
+        空气 & \verb|G4_AIR| & NIST 材料 & World 材料 \\
+        水 & \verb|G4_WATER| & NIST 材料，近似 \verb|1 g/cm3| & 人体软组织、正常细胞、未含硼区域 \\
+        $^{10}B$ 硼化水 & \verb|B10_Borated_Water| & \verb|G4_WATER + EnrichedB10|，$^{10}B$ 质量分数由设定浓度控制 & 含硼肿瘤细胞或含硼壳层 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+自定义含 $^{10}B$ 材料中，$^{10}B$ 作为同位素定义：
+
+\begin{verbatim}
+Z = 5, A = 10, molar mass = 10.012937 g/mole
+\end{verbatim}
+
+硼质量分数由：
+
+\begin{verbatim}
+boronFraction = boronPPM * 1e-6
+\end{verbatim}
+
+控制。Q2 默认用于机制展示的增强设置为 \verb|500000 ppm|，即 50\% 质量分数的信号增强模型。这个浓度明显高于真实 BNCT 治疗中常见的几十 ppm 量级，主要用于在有限事件数下获得足够的 $^{10}B(n,\alpha)^{7}Li$ 反应信号。
+
+\subsection{计分指标}
+
+所有吸收剂量均由对应体积内的累计能量沉积除以质量得到：
+
+\begin{equation}
+    D = \frac{E_\mathrm{dep}}{m}.
+    \label{eq:dose}
+\end{equation}
+
+本报告使用的计分口径如下：
+
 \begin{itemize}
-    \item Github: \url{https://github.com/jweihe/UCAS_Latex_Template}
-    \item Overleaf:  \url{https://www.overleaf.com/latex/templates/UCASke-cheng-lun-wen-mo-ban/bcwvxncqffkw}
+    \item \textbf{Q1 肿瘤区/正常组织平均 event 剂量}：单个初级粒子事件在宏观肿瘤区或正常组织中的能量沉积除以对应区域质量，再对全部事件取平均。肿瘤区质量按水密度和肿瘤体积估算；正常组织质量按整个人体模型体积扣除肿瘤体积估算。因此，两者数值同时受能量沉积和区域质量影响。
+    \item \textbf{Q1 深度剂量与二维热图}：分别统计沿 y 方向各 bin 和三维体素内的累计能量沉积；图中为归一化能量沉积分布，用于比较空间形状，不表示绝对剂量。
+    \item \textbf{Q1 LET}：按每个 Geant4 step 的 \verb|E_dep / stepLength| 统计，并按 step 数归一化。该量用于比较本模拟中的微观能损特征，不等同于剂量加权 LET 或临床 RBE。
+    \item \textbf{Q2 整细胞剂量}：整次运行中沉积在单个球形细胞内的总能量除以完整细胞质量，包含该细胞核内的能量沉积。
+    \item \textbf{Q2 细胞核剂量}：整次运行中沉积在单个细胞核内的总能量除以细胞核质量。肿瘤细胞和对照细胞的平均值均对各自全部 \verb|2048| 个细胞求平均，未发生能量沉积的细胞也以零值计入。
+    \item \textbf{Q2 y 投影细胞剂量}：将同一 \verb|(x,z)| 柱内不同 y 层细胞的整细胞剂量相加，仅用于显示微区内的空间分布。
+    \item \textbf{alpha+$^{7}Li$ 二次粒子产额}：运行中生成的 alpha 与 $^{7}Li$ 二次粒子数量之和，用作 BNCT 反应活性的代理指标；它不是严格的反应次数。
 \end{itemize}
 
-%%----------- 参考文献 -------------------%%
-%在reference.bib文件中填写参考文献，此处自动生成
+Q1 使用每事件宏观区域计分，Q2 使用整次运行累计的单细胞计分，两者质量尺度和归一化方式不同，不能直接比较绝对剂量。
 
-\reference
+\section*{后续内容}
 
+Q1、Q2、局限性和结论部分将按同一格式继续从 Markdown 报告迁移。当前版本先保留摘要、基本研究内容、几何模型、材料定义与计分指标，用于预览封面、目录、表格、图片、公式和代码块的整体排版效果。
 
 \end{document}
